@@ -1,12 +1,13 @@
-import { Sequelize } from 'sequelize';
+import { Sequelize } from 'sequelize'
 
+// Thông tin kết nối đọc từ file .env
 const sequelize = new Sequelize(
-  'e-commerce-filter_db', // database name
-  'postgres', // username
-  'postgres', // password
+  process.env.DB_NAME, // database name
+  process.env.DB_USER, // username
+  process.env.DB_PASSWORD, // password
   {
-    host: 'localhost', // host
-    port: 5432, // port
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT,
     dialect: 'postgres',
     logging: false,
     define: {
@@ -14,8 +15,8 @@ const sequelize = new Sequelize(
       timestamps: false,
     },
   }
-);
+)
 
-await sequelize.authenticate();
+await sequelize.authenticate()
 
-export default sequelize;
+export default sequelize

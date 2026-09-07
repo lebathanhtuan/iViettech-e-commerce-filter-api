@@ -1,18 +1,10 @@
 import express from 'express'
-import {
-  getAllProducts,
-  getProductDetail,
-  createProduct,
-  updateProduct,
-  deleteProduct,
-} from '../controllers/product.controller.js'
+import { getProducts, getProductDetail } from '../controllers/product.controller.js'
 
 const router = express.Router()
 
-router.get('/', getAllProducts)
+// API cho user, không cần đăng nhập
+router.get('/', getProducts)
 router.get('/:id', getProductDetail)
-router.post('/', createProduct)
-router.patch('/:id', updateProduct)
-router.delete('/:id', deleteProduct)
 
 export default router

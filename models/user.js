@@ -22,6 +22,17 @@ export default class User extends Model {
     password: {
       type: DataTypes.STRING(255),
       allowNull: false
+    },
+    // Phân quyền: 'user' | 'admin'
+    role: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: 'user'
+    },
+    // Lưu refresh token hiện tại của user để cấp lại access token
+    refresh_token: {
+      type: DataTypes.TEXT,
+      allowNull: true
     }
   }, {
     sequelize,
