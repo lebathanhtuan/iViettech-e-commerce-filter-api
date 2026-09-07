@@ -4,15 +4,28 @@ import models from '../models/index.js'
 
 const { Product, Category } = models
 
+// Các controller dưới đây không cần try/catch:
+// Express 5 tự chuyển lỗi sang errorHandler (middlewares/error.middleware.js)
+
+// Ảnh upload được lưu trong DB dạng đường dẫn tương đối "/uploads/xxx.jpg"
+// -> ghép thêm BASE_URL để frontend hiển thị được: http://localhost:3000/uploads/xxx.jpg
+// Ảnh là link ngoài (http...) thì giữ nguyên
+function getImageUrl(image) {
+  if (image && image.startsWith('/uploads/')) {
+    return `${process.env.BASE_URL}${image}`
+  }
+  return image
+}
+
 // Chuyển dữ liệu sản phẩm về đúng dạng mà frontend cần
 function formatProduct(product) {
   return {
     id: product.id,
     name: product.name,
     price: Number(product.price),
-    image: product.image,
+    image: getImageUrl(product.image),
     description: product.description,
-    categoryId: product.category_id,
+    categoryId: Number(product.category_id),
     categoryName: product.category?.name,
   }
 }
@@ -56,9 +69,15 @@ async function findProducts(query, defaultLimit) {
     limit: limit,
   })
 
+  // Trả về 2 phần: data là danh sách sản phẩm, meta là thông tin phân trang
   return {
     data: rows.map(formatProduct),
-    total: count,
+    meta: {
+      page: page,
+      limit: limit,
+      total: count, // tổng số sản phẩm khớp điều kiện lọc
+      totalPages: Math.ceil(count / limit), // tổng số trang
+    },
   }
 }
 
@@ -66,118 +85,99 @@ async function findProducts(query, defaultLimit) {
 
 // GET /products - danh sách sản phẩm cho trang user (mặc định 8 sản phẩm / trang)
 export async function getProducts(req, res) {
-  try {
-    const result = await findProducts(req.query, 8)
+  const result = await findProducts(req.query, 8)
 
-    res.status(200).json(result)
-  } catch (error) {
-    console.error(error)
-    res.status(400).json({ message: 'Lỗi server' })
-  }
+  res.status(200).json(result)
 }
 
 // GET /products/:id - chi tiết 1 sản phẩm
 export async function getProductDetail(req, res) {
-  try {
-    const { id } = req.params
+  const { id } = req.params
 
-    const result = await Product.findByPk(id, {
-      include: [
-        {
-          model: Category,
-          as: 'category',
-          attributes: ['id', 'name'],
-        },
-      ],
-    })
+  const result = await Product.findByPk(id, {
+    include: [
+      {
+        model: Category,
+        as: 'category',
+        attributes: ['id', 'name'],
+      },
+    ],
+  })
 
-    if (!result) {
-      return res.status(404).json({ message: 'Không tìm thấy sản phẩm' })
-    }
-
-    res.status(200).json(formatProduct(result))
-  } catch (error) {
-    console.error(error)
-    res.status(400).json({ message: 'Lỗi server' })
+  if (!result) {
+    return res.status(404).json({ message: 'Không tìm thấy sản phẩm' })
   }
+
+  res.status(200).json(formatProduct(result))
 }
 
 // ===== API dành cho ADMIN (cần token + role admin) =====
 
 // GET /admin/products - danh sách sản phẩm cho trang admin (mặc định 10 sản phẩm / trang)
 export async function getAdminProducts(req, res) {
-  try {
-    const result = await findProducts(req.query, 10)
+  const result = await findProducts(req.query, 10)
 
-    res.status(200).json(result)
-  } catch (error) {
-    console.error(error)
-    res.status(400).json({ message: 'Lỗi server' })
-  }
+  res.status(200).json(result)
 }
 
-// POST /admin/products - tạo mới sản phẩm, body: { name, price, categoryId, image, description }
+// POST /admin/products - tạo mới sản phẩm
+// Body dạng multipart/form-data: { name, price, categoryId, description, image (file) }
 export async function createProduct(req, res) {
-  try {
-    const { name, price, categoryId, image, description } = req.body
+  const { name, price, categoryId, description } = req.body
 
-    const newProduct = await Product.create({
-      name: name,
-      price: price,
-      category_id: categoryId,
-      image: image,
-      description: description,
-    })
+  // req.file do upload.single('image') tạo ra. Chỉ lưu đường dẫn tương đối, không lưu req.file.path
+  const image = req.file ? `/uploads/${req.file.filename}` : null
 
-    res.status(201).json(formatProduct(newProduct))
-  } catch (error) {
-    console.error(error)
-    res.status(400).json({ message: 'Lỗi server' })
-  }
+  const newProduct = await Product.create({
+    name: name,
+    price: price,
+    category_id: categoryId,
+    image: image,
+    description: description,
+  })
+
+  res.status(201).json(formatProduct(newProduct))
 }
 
-// PATCH /admin/products/:id - cập nhật sản phẩm, body: { name, price, categoryId, image, description }
+// PATCH /admin/products/:id - cập nhật sản phẩm
+// Body dạng multipart/form-data: { name, price, categoryId, description, image (file, không bắt buộc) }
 export async function updateProduct(req, res) {
-  try {
-    const { id } = req.params
-    const { name, price, categoryId, image, description } = req.body
+  const { id } = req.params
+  const { name, price, categoryId, description } = req.body
 
-    const product = await Product.findByPk(id)
-    if (!product) {
-      return res.status(404).json({ message: 'Không tìm thấy sản phẩm' })
-    }
-
-    const result = await product.update({
-      name: name,
-      price: price,
-      category_id: categoryId,
-      image: image,
-      description: description,
-    })
-
-    res.status(200).json(formatProduct(result))
-  } catch (error) {
-    console.error(error)
-    res.status(400).json({ message: 'Lỗi server' })
+  const product = await Product.findByPk(id)
+  if (!product) {
+    return res.status(404).json({ message: 'Không tìm thấy sản phẩm' })
   }
+
+  const updateData = {
+    name: name,
+    price: price,
+    category_id: categoryId,
+    description: description,
+  }
+
+  // Có gửi file mới thì mới đổi ảnh, không thì giữ ảnh cũ
+  if (req.file) {
+    updateData.image = `/uploads/${req.file.filename}`
+  }
+
+  const result = await product.update(updateData)
+
+  res.status(200).json(formatProduct(result))
 }
 
 // DELETE /admin/products/:id - xóa sản phẩm
 export async function deleteProduct(req, res) {
-  try {
-    const { id } = req.params
+  const { id } = req.params
 
-    const result = await Product.destroy({
-      where: { id: id },
-    })
+  const result = await Product.destroy({
+    where: { id: id },
+  })
 
-    if (result === 0) {
-      return res.status(404).json({ message: 'Không tìm thấy sản phẩm để xóa' })
-    }
-
-    res.status(200).json({ message: 'Xóa sản phẩm thành công' })
-  } catch (error) {
-    console.error(error)
-    res.status(400).json({ message: 'Lỗi server' })
+  if (result === 0) {
+    return res.status(404).json({ message: 'Không tìm thấy sản phẩm để xóa' })
   }
+
+  res.status(200).json({ message: 'Xóa sản phẩm thành công' })
 }

@@ -25,3 +25,6 @@ dist-ssr
 
 # Biến môi trường
 .env
+
+# File do người dùng upload
+uploads/

@@ -23,6 +23,7 @@ Nếu bảng `users` chưa có 2 cột `role`, `refresh_token` thì chạy file 
 | `JWT_REFRESH_SECRET` | Chuỗi bí mật ký refresh token |
 | `ACCESS_TOKEN_EXPIRES_IN` | Thời gian sống access token (vd: `15m`) |
 | `REFRESH_TOKEN_EXPIRES_IN` | Thời gian sống refresh token (vd: `7d`) |
+| `BASE_URL` | Địa chỉ public của server, dùng để ghép link ảnh upload (vd: `http://localhost:3000`) |
 
 ## Luồng xác thực
 
@@ -56,16 +57,74 @@ Nếu bảng `users` chưa có 2 cột `role`, `refresh_token` thì chạy file 
 | GET | `/products` | ✗ | Query: `keyword, categoryId, sort, page, limit` (mặc định 8/trang) |
 | GET | `/products/:id` | ✗ | Chi tiết sản phẩm |
 
+Kết quả của API danh sách gồm 2 phần: `data` là danh sách sản phẩm của trang hiện tại, `meta` là thông tin phân trang.
+
+```json
+{
+  "data": [{ "id": 1, "name": "MacBook Air M4", "price": 26990000, "image": "...", "categoryId": 1, "categoryName": "Laptop" }],
+  "meta": { "page": 1, "limit": 8, "total": 18, "totalPages": 3 }
+}
+```
+
 ### Product - dành cho ADMIN (cần token + role `admin`)
 
 | Method | Đường dẫn | Ghi chú |
 | --- | --- | --- |
-| GET | `/admin/products` | Query giống `/products` (mặc định 10/trang) |
-| POST | `/admin/products` | `{ name, price, categoryId, image, description }` |
-| PATCH | `/admin/products/:id` | `{ name, price, categoryId, image, description }` |
+| GET | `/admin/products` | Query giống `/products` (mặc định 10/trang), kết quả cũng có `data` + `meta` |
+| POST | `/admin/products` | Body `multipart/form-data`: `name, price, categoryId, description, image (file)` |
+| PATCH | `/admin/products/:id` | Body `multipart/form-data`, giống POST. Không gửi `image` thì giữ ảnh cũ |
 | DELETE | `/admin/products/:id` | |
 
 Không có token -> `401`, có token nhưng không phải admin -> `403`.
+
+## Upload ảnh sản phẩm (Multer)
+
+- `middlewares/upload.middleware.js`: cấu hình `multer.diskStorage` lưu file vào thư mục `uploads/`, tên file `image-<uuid>.<ext>`, chỉ nhận JPG/PNG/WEBP, tối đa 5 MB.
+- Route dùng `upload.single('image')` -> file nằm trong `req.file`, các field text nằm trong `req.body`.
+- DB chỉ lưu đường dẫn tương đối `/uploads/<filename>` (cột `products.image`). Khi trả về frontend, controller ghép `BASE_URL` thành link đầy đủ.
+- `app.js` dùng `express.static` để truy cập file: `http://localhost:3000/uploads/<filename>`.
+- Lỗi Multer (file quá lớn, sai loại) được bắt ở `middlewares/error.middleware.js`, đặt sau routes.
+- Thư mục `uploads/` nằm trong `.gitignore`, server tự tạo khi chạy.
+
+## Xử lý lỗi tập trung
+
+Tất cả controller đều **không viết try/catch**. Express 5 tự bắt lỗi (kể cả lỗi trong hàm `async`) rồi chuyển sang middleware xử lý lỗi ở cuối `app.js`:
+
+```js
+app.use('/products', productRoute)
+// ... các route khác
+
+// Middleware xử lý lỗi phải đặt sau routes
+app.use(errorHandler)
+```
+
+`middlewares/error.middleware.js` chia 3 trường hợp:
+
+| Loại lỗi | Ví dụ | Trả về |
+| --- | --- | --- |
+| Lỗi Multer | File > 5 MB | `400` + message cụ thể |
+| Lỗi chủ động (có `error.status`) | `fileFilter` báo sai loại file | `error.status` + `error.message` |
+| Lỗi ngoài dự tính | Lỗi database, lỗi code | `500` + `{ message: 'Lỗi server' }`, log full lỗi ra terminal |
+
+Cách tạo lỗi chủ động ở bất kỳ đâu:
+
+```js
+const error = new Error('Chỉ cho phép upload file JPG, PNG hoặc WEBP')
+error.status = 400
+throw error // hoặc cb(error) khi ở trong Multer
+```
+
+Những trường hợp **không phải lỗi** thì vẫn `return` response ngay trong controller cho dễ đọc:
+
+```js
+if (!product) {
+  return res.status(404).json({ message: 'Không tìm thấy sản phẩm' })
+}
+```
+
+Hai chỗ vẫn giữ try/catch có chủ đích, vì token sai là tình huống bình thường và cần trả `401` chứ không phải `500`: `verifyToken` trong `middlewares/auth.middleware.js` và `jwt.verify` trong API `/refresh-token`.
+
+> Express 4 không tự bắt lỗi của hàm `async`. Nếu dùng Express 4 thì controller phải viết `try { ... } catch (error) { next(error) }`.
 
 ## Cấu trúc thư mục
 
@@ -73,7 +132,10 @@ Không có token -> `401`, có token nhưng không phải admin -> `403`.
 app.js                      # Khởi tạo express, khai báo routes
 config/db.js                # Kết nối Sequelize (đọc từ .env)
 models/                     # Model Sequelize (User có thêm role, refresh_token)
-middlewares/auth.middleware.js  # verifyToken, checkAdmin
+middlewares/
+├── auth.middleware.js      # verifyToken, checkAdmin
+├── upload.middleware.js    # Multer: diskStorage, fileFilter, limits
+└── error.middleware.js     # Bắt lỗi Multer
 controllers/                # Xử lý logic cho từng API
 routes/
 ├── auth.route.js
@@ -81,4 +143,5 @@ routes/
 ├── product.route.js        # API user
 └── admin/product.route.js  # API admin (router.use(verifyToken, checkAdmin))
 database/migration.sql      # Thêm cột role, refresh_token + tài khoản admin mẫu
+uploads/                    # File ảnh upload (không commit)
 ```

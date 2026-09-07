@@ -14,7 +14,7 @@ export const verifyToken = (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET)
     req.user = decoded
     next()
-  } catch (error) {
+  } catch {
     // Token hết hạn hoặc sai -> trả 401 để frontend gọi API refresh token
     return res.status(401).json({ message: 'Token không hợp lệ hoặc đã hết hạn' })
   }

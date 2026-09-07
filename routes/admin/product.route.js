@@ -6,6 +6,7 @@ import {
   deleteProduct,
 } from '../../controllers/product.controller.js'
 import { verifyToken, checkAdmin } from '../../middlewares/auth.middleware.js'
+import upload from '../../middlewares/upload.middleware.js'
 
 const router = express.Router()
 
@@ -13,8 +14,12 @@ const router = express.Router()
 router.use(verifyToken, checkAdmin)
 
 router.get('/', getAdminProducts)
-router.post('/', createProduct)
-router.patch('/:id', updateProduct)
+
+// Body gửi dạng multipart/form-data, field ảnh tên là "image"
+// Sau upload.single('image'): file nằm trong req.file, các field text nằm trong req.body
+router.post('/', upload.single('image'), createProduct)
+router.patch('/:id', upload.single('image'), updateProduct)
+
 router.delete('/:id', deleteProduct)
 
 export default router
