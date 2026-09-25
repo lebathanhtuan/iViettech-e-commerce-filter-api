@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 
 import models from '../models/index.js'
+import { formatUser } from '../utils/format.js'
 
 const { User } = models
 
@@ -22,16 +23,6 @@ function generateRefreshToken(user) {
   return jwt.sign({ id: user.id }, process.env.JWT_REFRESH_SECRET, {
     expiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN,
   })
-}
-
-// Chuyển dữ liệu user về dạng trả cho frontend (không có password, refresh_token)
-function formatUser(user) {
-  return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    role: user.role,
-  }
 }
 
 // POST /register - đăng ký tài khoản, body: { fullName, email, password }
@@ -126,6 +117,59 @@ export async function getMyProfile(req, res) {
   if (!result) {
     return res.status(404).json({ message: 'Không tìm thấy user' })
   }
+
+  res.status(200).json(formatUser(result))
+}
+
+// PATCH /profile - cập nhật thông tin user đang đăng nhập (cần token), body: { name, phone }
+// Không cho đổi email vì email dùng để đăng nhập
+export async function updateMyProfile(req, res) {
+  const { name, phone } = req.body
+
+  const user = await User.findByPk(req.user.id)
+  if (!user) {
+    return res.status(404).json({ message: 'Không tìm thấy user' })
+  }
+
+  const result = await user.update({ name: name, phone: phone })
+
+  res.status(200).json(formatUser(result))
+}
+
+// PATCH /profile/password - đổi mật khẩu (cần token), body: { currentPassword, newPassword }
+export async function changePassword(req, res) {
+  const { currentPassword, newPassword } = req.body
+
+  const user = await User.findByPk(req.user.id)
+  if (!user) {
+    return res.status(404).json({ message: 'Không tìm thấy user' })
+  }
+
+  // Phải nhập đúng mật khẩu hiện tại mới được đổi
+  const isMatchPassword = await bcrypt.compare(currentPassword, user.password)
+  if (!isMatchPassword) {
+    return res.status(400).json({ message: 'Mật khẩu hiện tại không đúng' })
+  }
+
+  const hashedPassword = await bcrypt.hash(newPassword, 10)
+  await user.update({ password: hashedPassword })
+
+  res.status(200).json({ message: 'Đổi mật khẩu thành công' })
+}
+
+// PATCH /profile/avatar - đổi avatar (cần token)
+// Body dạng multipart/form-data, field ảnh tên là "avatar"
+export async function updateAvatar(req, res) {
+  if (!req.file) {
+    return res.status(400).json({ message: 'Vui lòng chọn ảnh' })
+  }
+
+  const user = await User.findByPk(req.user.id)
+  if (!user) {
+    return res.status(404).json({ message: 'Không tìm thấy user' })
+  }
+
+  const result = await user.update({ avatar: `/uploads/${req.file.filename}` })
 
   res.status(200).json(formatUser(result))
 }

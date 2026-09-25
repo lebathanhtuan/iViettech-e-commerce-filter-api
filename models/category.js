@@ -18,7 +18,9 @@ export default class Category extends Model {
     sequelize,
     tableName: 'categories',
     schema: 'public',
-    timestamps: false,
+    timestamps: true,
+    paranoid: true,
+    underscored: true,
     indexes: [
       {
         name: "categories_pkey",

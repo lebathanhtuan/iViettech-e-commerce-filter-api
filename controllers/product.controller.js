@@ -1,34 +1,12 @@
 import { Op } from 'sequelize'
 
 import models from '../models/index.js'
+import { formatProduct } from '../utils/format.js'
 
 const { Product, Category } = models
 
 // Các controller dưới đây không cần try/catch:
 // Express 5 tự chuyển lỗi sang errorHandler (middlewares/error.middleware.js)
-
-// Ảnh upload được lưu trong DB dạng đường dẫn tương đối "/uploads/xxx.jpg"
-// -> ghép thêm BASE_URL để frontend hiển thị được: http://localhost:3000/uploads/xxx.jpg
-// Ảnh là link ngoài (http...) thì giữ nguyên
-function getImageUrl(image) {
-  if (image && image.startsWith('/uploads/')) {
-    return `${process.env.BASE_URL}${image}`
-  }
-  return image
-}
-
-// Chuyển dữ liệu sản phẩm về đúng dạng mà frontend cần
-function formatProduct(product) {
-  return {
-    id: product.id,
-    name: product.name,
-    price: Number(product.price),
-    image: getImageUrl(product.image),
-    description: product.description,
-    categoryId: Number(product.category_id),
-    categoryName: product.category?.name,
-  }
-}
 
 // Hàm dùng chung: lấy danh sách sản phẩm có search / filter / sort / phân trang
 // Query params: keyword, categoryId, sort, page, limit
@@ -122,6 +100,7 @@ export async function getAdminProducts(req, res) {
 
 // POST /admin/products - tạo mới sản phẩm
 // Body dạng multipart/form-data: { name, price, categoryId, description, image (file) }
+// description là chuỗi HTML do Quill editor ở trang admin tạo ra
 export async function createProduct(req, res) {
   const { name, price, categoryId, description } = req.body
 
@@ -168,6 +147,8 @@ export async function updateProduct(req, res) {
 }
 
 // DELETE /admin/products/:id - xóa sản phẩm
+// Model có paranoid: true nên destroy() là xóa mềm: chỉ ghi thời gian vào deleted_at,
+// các API findAll / findByPk sau đó tự bỏ qua sản phẩm này (đơn hàng cũ vẫn giữ được thông tin)
 export async function deleteProduct(req, res) {
   const { id } = req.params
 

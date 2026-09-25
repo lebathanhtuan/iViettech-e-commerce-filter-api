@@ -1,7 +1,7 @@
 import _sequelize from 'sequelize';
 const { Model, Sequelize } = _sequelize;
 
-export default class User extends Model {
+export default class Order extends Model {
   static init(sequelize, DataTypes) {
   return super.init({
     id: {
@@ -10,53 +10,51 @@ export default class User extends Model {
       allowNull: false,
       primaryKey: true
     },
-    name: {
+    user_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'users',
+        key: 'id'
+      }
+    },
+    full_name: {
       type: DataTypes.STRING(100),
       allowNull: false
     },
-    email: {
-      type: DataTypes.STRING(255),
-      allowNull: false,
-      unique: "users_email_key"
+    phone: {
+      type: DataTypes.STRING(20),
+      allowNull: false
     },
-    password: {
+    address: {
       type: DataTypes.STRING(255),
       allowNull: false
     },
-    role: {
-      type: DataTypes.STRING(20),
-      allowNull: false,
-      defaultValue: "user"
+    total_price: {
+      type: DataTypes.DECIMAL,
+      allowNull: false
     },
-    refresh_token: {
-      type: DataTypes.TEXT,
-      allowNull: true
-    },
-    phone: {
-      type: DataTypes.STRING(20),
-      allowNull: true
-    },
-    avatar: {
-      type: DataTypes.STRING(500),
-      allowNull: true
+    code: {
+      type: DataTypes.STRING(8),
+      allowNull: false
     }
   }, {
     sequelize,
-    tableName: 'users',
+    tableName: 'orders',
     schema: 'public',
     timestamps: true,
     paranoid: true,
     underscored: true,
     indexes: [
       {
-        name: "users_email_key",
+        name: "orders_code_key",
         unique: true,
         fields: [
-          { name: "email" },
+          { name: "code" },
         ]
       },
       {
-        name: "users_pkey",
+        name: "orders_pkey",
         unique: true,
         fields: [
           { name: "id" },

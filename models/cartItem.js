@@ -1,7 +1,7 @@
 import _sequelize from 'sequelize';
 const { Model, Sequelize } = _sequelize;
 
-export default class Product extends Model {
+export default class CartItem extends Model {
   static init(sequelize, DataTypes) {
   return super.init({
     id: {
@@ -10,43 +10,48 @@ export default class Product extends Model {
       allowNull: false,
       primaryKey: true
     },
-    name: {
-      type: DataTypes.STRING(255),
-      allowNull: false
-    },
-    price: {
-      type: DataTypes.DECIMAL,
-      allowNull: false
-    },
-    category_id: {
+    user_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
-        model: 'categories',
+        model: 'users',
         key: 'id'
       }
     },
-    image: {
-      type: DataTypes.STRING(500),
-      allowNull: true
+    product_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'products',
+        key: 'id'
+      }
     },
-    description: {
-      type: DataTypes.TEXT,
-      allowNull: true
+    quantity: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1
     }
   }, {
     sequelize,
-    tableName: 'products',
+    tableName: 'cart_items',
     schema: 'public',
     timestamps: true,
     paranoid: true,
     underscored: true,
     indexes: [
       {
-        name: "products_pkey",
+        name: "cart_items_pkey",
         unique: true,
         fields: [
           { name: "id" },
+        ]
+      },
+      {
+        name: "cart_items_user_id_product_id_key",
+        unique: true,
+        fields: [
+          { name: "user_id" },
+          { name: "product_id" },
         ]
       },
     ]
