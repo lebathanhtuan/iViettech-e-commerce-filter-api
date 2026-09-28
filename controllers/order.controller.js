@@ -2,6 +2,7 @@ import { randomInt } from 'node:crypto'
 
 import models, { sequelize } from '../models/index.js'
 import { formatProduct } from '../utils/format.js'
+import { sendOrderConfirmationEmail } from '../utils/mail.js'
 
 const { Order, OrderItem, CartItem, Product } = models
 
@@ -111,6 +112,11 @@ export async function createOrder(req, res) {
 
     return order
   })
+
+  // Gửi email xác nhận đơn hàng. Cố ý KHÔNG await:
+  // - user không phải chờ gửi mail xong (mất vài giây) mới thấy trang đặt hàng thành công
+  // - gửi mail lỗi (sai cấu hình, mất mạng...) cũng không ảnh hưởng tới đơn hàng đã tạo
+  sendOrderConfirmationEmail(newOrder.id)
 
   res.status(201).json({
     id: newOrder.id,

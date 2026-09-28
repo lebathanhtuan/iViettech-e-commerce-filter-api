@@ -3,6 +3,7 @@ const DataTypes = _sequelize.DataTypes;
 import _CartItem from  "./cartItem.js";
 import _Category from  "./category.js";
 import _Favorite from  "./favorite.js";
+import _Message from  "./message.js";
 import _OrderItem from  "./orderItem.js";
 import _Order from  "./order.js";
 import _Product from  "./product.js";
@@ -13,6 +14,7 @@ export default function initModels(sequelize) {
   const CartItem = _CartItem.init(sequelize, DataTypes);
   const Category = _Category.init(sequelize, DataTypes);
   const Favorite = _Favorite.init(sequelize, DataTypes);
+  const Message = _Message.init(sequelize, DataTypes);
   const OrderItem = _OrderItem.init(sequelize, DataTypes);
   const Order = _Order.init(sequelize, DataTypes);
   const Product = _Product.init(sequelize, DataTypes);
@@ -35,6 +37,10 @@ export default function initModels(sequelize) {
   User.hasMany(CartItem, { as: "cart_items", foreignKey: "user_id"});
   Favorite.belongsTo(User, { as: "user", foreignKey: "user_id"});
   User.hasMany(Favorite, { as: "favorites", foreignKey: "user_id"});
+  Message.belongsTo(User, { as: "sender", foreignKey: "sender_id"});
+  User.hasMany(Message, { as: "messages", foreignKey: "sender_id"});
+  Message.belongsTo(User, { as: "user", foreignKey: "user_id"});
+  User.hasMany(Message, { as: "user_messages", foreignKey: "user_id"});
   Order.belongsTo(User, { as: "user", foreignKey: "user_id"});
   User.hasMany(Order, { as: "orders", foreignKey: "user_id"});
   Review.belongsTo(User, { as: "user", foreignKey: "user_id"});
@@ -44,6 +50,7 @@ export default function initModels(sequelize) {
     CartItem,
     Category,
     Favorite,
+    Message,
     OrderItem,
     Order,
     Product,

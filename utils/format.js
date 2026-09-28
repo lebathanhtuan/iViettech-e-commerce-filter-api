@@ -34,3 +34,15 @@ export function formatUser(user) {
     avatar: getImageUrl(user.avatar),
   }
 }
+
+// Tin nhắn chat: sender_id khác user_id -> tin do admin gửi
+export function formatMessage(message) {
+  return {
+    id: message.id,
+    userId: message.user_id,
+    senderId: message.sender_id,
+    fromAdmin: message.sender_id !== message.user_id,
+    content: message.content,
+    createdAt: message.createdAt,
+  }
+}

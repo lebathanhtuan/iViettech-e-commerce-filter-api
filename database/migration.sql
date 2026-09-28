@@ -133,3 +133,23 @@ WHERE deleted_at IS NULL
   );
 CREATE UNIQUE INDEX IF NOT EXISTS reviews_user_id_product_id_key
   ON reviews (user_id, product_id) WHERE deleted_at IS NULL;
+
+-- =====================================================================
+-- Phần 4: chat giữa user và admin (socket.io) - xem docs/chat-socket-io.md
+-- =====================================================================
+
+-- Mỗi user có đúng 1 cuộc trò chuyện với "shop" (tất cả admin dùng chung)
+--   user_id:   cuộc trò chuyện này là của user nào
+--   sender_id: người gửi tin nhắn (chính user đó, hoặc 1 admin trả lời)
+-- -> sender_id = user_id là tin của khách, khác nhau là tin của admin
+CREATE TABLE IF NOT EXISTS messages (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  content TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS messages_user_id_idx ON messages (user_id);

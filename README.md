@@ -13,6 +13,22 @@ npm run dev
 Chạy file `database/migration.sql` để thêm các cột / bảng mới (chạy lại nhiều lần cũng không sao).
 File này cũng tạo sẵn tài khoản admin: `admin@example.com` / `123456`.
 
+Tạo database mới từ đầu (DB trống) thì chạy lần lượt:
+
+```bash
+createdb -U postgres e-commerce-filter_db
+psql -U postgres -d e-commerce-filter_db -f database/schema.sql     # bảng gốc: users, categories, products
+psql -U postgres -d e-commerce-filter_db -f database/migration.sql  # các cột / bảng còn lại
+psql -U postgres -d e-commerce-filter_db -f database/seed.sql       # dữ liệu mẫu (XÓA HẾT dữ liệu cũ)
+```
+
+`seed.sql` tạo 4 tài khoản (mật khẩu đều là `123456`): `admin@example.com` (admin), `an@example.com`, `binh@example.com`, `chi@example.com`.
+
+## Tài liệu tính năng
+
+- [Chat giữa user và admin (Socket.IO)](docs/chat-socket-io.md)
+- [Gửi email xác nhận đơn hàng (Nodemailer)](docs/order-email-nodemailer.md)
+
 ## Database
 
 | Bảng | Các cột | Ghi chú |
@@ -25,6 +41,7 @@ File này cũng tạo sẵn tài khoản admin: `admin@example.com` / `123456`.
 | `order_items` | `id, order_id, product_id, price, quantity` | `price` là giá lúc mua. Xóa sản phẩm thì `product_id = NULL` |
 | `reviews` | `id, user_id, product_id, rating, comment` | `rating` từ 1 đến 5. Unique `(user_id, product_id)`: mỗi user chỉ đánh giá 1 lần |
 | `favorites` | `id, user_id, product_id` | Unique `(user_id, product_id)` |
+| `messages` | `id, user_id, sender_id, content` | Tin nhắn chat. `sender_id = user_id` là tin của khách, khác là tin của admin |
 
 Ngoài các cột trên, **tất cả các bảng** đều có thêm `created_at`, `updated_at`, `deleted_at` -> model dùng:
 
@@ -66,6 +83,8 @@ cộng thêm `additional: { underscored: true }`. sequelize-auto thấy bảng c
 | `ACCESS_TOKEN_EXPIRES_IN` | Thời gian sống access token (vd: `15m`) |
 | `REFRESH_TOKEN_EXPIRES_IN` | Thời gian sống refresh token (vd: `7d`) |
 | `BASE_URL` | Địa chỉ public của server, dùng để ghép link ảnh upload (vd: `http://localhost:3000`) |
+| `CLIENT_URL` | Địa chỉ frontend, dùng cho link trong email (vd: `http://localhost:5173`) |
+| `MAIL_HOST`, `MAIL_PORT`, `MAIL_SECURE`, `MAIL_USER`, `MAIL_PASSWORD`, `MAIL_FROM` | Cấu hình SMTP gửi email đơn hàng, xem [docs/order-email-nodemailer.md](docs/order-email-nodemailer.md) |
 
 ## Luồng xác thực
 
@@ -126,7 +145,7 @@ Kết quả của API danh sách gồm 2 phần: `data` là danh sách sản ph�
 
 | Method | Đường dẫn | Body / Ghi chú |
 | --- | --- | --- |
-| POST | `/orders` | `{ fullName, phone, address }` -> `{ id, code, totalPrice }`. Lấy sản phẩm từ giỏ, tạo đơn, xóa giỏ (trong 1 transaction) |
+| POST | `/orders` | `{ fullName, phone, address }` -> `{ id, code, totalPrice }`. Lấy sản phẩm từ giỏ, tạo đơn, xóa giỏ (trong 1 transaction), rồi gửi email xác nhận |
 | GET | `/orders` | Lịch sử đơn hàng, mới nhất lên đầu, kèm `items` |
 | GET | `/orders/:code` | Chi tiết 1 đơn theo mã đơn (chỉ xem được đơn của mình) |
 
@@ -139,6 +158,16 @@ Thông tin thanh toán (thẻ) chỉ là form giả lập ở frontend, không g
 | GET | `/favorites` | Mảng sản phẩm yêu thích |
 | POST | `/favorites` | `{ productId }` - đã có thì bỏ qua (`findOrCreate`) |
 | DELETE | `/favorites/:productId` | |
+
+### Chat (cần token)
+
+Gửi / nhận tin nhắn đi qua socket.io, các API dưới đây chỉ để lấy lịch sử. Chi tiết: [docs/chat-socket-io.md](docs/chat-socket-io.md).
+
+| Method | Đường dẫn | Ghi chú |
+| --- | --- | --- |
+| GET | `/chat/messages` | Lịch sử chat của user đang đăng nhập |
+| GET | `/admin/chat/conversations` | (Admin) Danh sách cuộc trò chuyện `[{ user, lastMessage }]` |
+| GET | `/admin/chat/conversations/:userId/messages` | (Admin) Lịch sử chat với 1 khách |
 
 ### Product - dành cho ADMIN (cần token + role `admin`)
 
@@ -205,6 +234,8 @@ Hai chỗ vẫn giữ try/catch có chủ đích, vì token sai là tình huốn
 ```
 app.js                      # Khởi tạo express, khai báo routes
 config/db.js                # Kết nối Sequelize (đọc từ .env)
+config/mail.js              # Transporter Nodemailer (đọc MAIL_* từ .env)
+socket/index.js             # Socket.io: xác thực token, room, event chat
 models/                     # Model sinh bằng sequelize-auto (npm run generate-models), không sửa tay
 scripts/generate-models.js  # Chạy sequelize-auto với thông tin DB lấy từ .env
 middlewares/
@@ -212,7 +243,8 @@ middlewares/
 ├── upload.middleware.js    # Multer: diskStorage, fileFilter, limits
 └── error.middleware.js     # Bắt lỗi Multer
 controllers/                # Xử lý logic cho từng API
-utils/format.js             # formatProduct, formatUser, getImageUrl (dùng chung)
+utils/format.js             # formatProduct, formatUser, formatMessage, getImageUrl (dùng chung)
+utils/mail.js               # Template + gửi email xác nhận đơn hàng
 routes/
 ├── auth.route.js           # Đăng nhập, đăng ký, profile
 ├── category.route.js
@@ -220,7 +252,12 @@ routes/
 ├── cart.route.js
 ├── order.route.js
 ├── favorite.route.js
-└── admin/product.route.js  # API admin (router.use(verifyToken, checkAdmin))
+├── chat.route.js           # Lịch sử chat của user
+├── admin/product.route.js  # API admin (router.use(verifyToken, checkAdmin))
+└── admin/chat.route.js     # API chat cho admin
+database/schema.sql         # Bảng gốc cho DB mới (users, categories, products)
 database/migration.sql      # Thêm cột / bảng mới + tài khoản admin mẫu
+database/seed.sql           # Dữ liệu mẫu (xóa hết dữ liệu cũ)
+docs/                       # Hướng dẫn setup chat, email
 uploads/                    # File ảnh upload (không commit)
 ```
