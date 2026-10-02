@@ -1,5 +1,5 @@
 import { Server } from 'socket.io'
-import jwt from 'jsonwebtoken'
+import { authenticateAccessToken } from '../utils/auth.js'
 
 import models from '../models/index.js'
 import { formatMessage } from '../utils/format.js'
@@ -13,19 +13,26 @@ const MAX_CONTENT_LENGTH = 1000
 // - Tất cả admin chung 1 room "admins" -> admin nào cũng thấy tin nhắn của khách
 const ADMIN_ROOM = 'admins'
 const getUserRoom = (userId) => `user:${userId}`
+const getSessionRoom = (userId) => `session:${userId}`
+let socketServer
+
+export function disconnectUserSockets(userId) {
+  socketServer?.in(getSessionRoom(userId)).disconnectSockets(true)
+}
 
 // Gắn socket.io vào HTTP server (dùng chung port với Express)
 export function initSocket(httpServer) {
   const io = new Server(httpServer, {
     cors: { origin: '*' },
   })
+  socketServer = io
 
   // Middleware xác thực: chạy 1 lần khi client kết nối
   // Frontend gửi access token qua: io(URL, { auth: { token } })
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     try {
       // Giống verifyToken của Express: giải mã ra { id, email, role }
-      socket.user = jwt.verify(socket.handshake.auth.token, process.env.JWT_ACCESS_SECRET)
+      socket.user = await authenticateAccessToken(socket.handshake.auth.token)
       next()
     } catch {
       // Frontend nhận được lỗi này ở sự kiện "connect_error" -> refresh token rồi kết nối lại
@@ -35,6 +42,7 @@ export function initSocket(httpServer) {
 
   io.on('connection', (socket) => {
     const { id, role } = socket.user
+    socket.join(getSessionRoom(id))
 
     if (role === 'admin') {
       socket.join(ADMIN_ROOM)

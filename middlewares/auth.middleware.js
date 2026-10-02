@@ -1,7 +1,7 @@
-import jwt from 'jsonwebtoken'
+import { authenticateAccessToken } from '../utils/auth.js'
 
 // Kiểm tra access token gửi lên trong header: Authorization: Bearer <token>
-export const verifyToken = (req, res, next) => {
+export const verifyToken = async (req, res, next) => {
   const authorization = req.headers.authorization
   if (!authorization || !authorization.startsWith('Bearer ')) {
     return res.status(401).json({ message: 'Không có token' })
@@ -11,12 +11,11 @@ export const verifyToken = (req, res, next) => {
 
   try {
     // Giải mã token -> lấy được { id, email, role } đã ký lúc login
-    const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET)
-    req.user = decoded
+    req.user = await authenticateAccessToken(token)
     next()
-  } catch {
-    // Token hết hạn hoặc sai -> trả 401 để frontend gọi API refresh token
-    return res.status(401).json({ message: 'Token không hợp lệ hoặc đã hết hạn' })
+  } catch (error) {
+    if (error.status === 401) return res.status(401).json({ message: error.message })
+    next(error)
   }
 }
 

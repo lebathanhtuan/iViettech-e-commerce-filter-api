@@ -26,14 +26,16 @@ psql -U postgres -d e-commerce-filter_db -f database/seed.sql       # dữ liệ
 
 ## Tài liệu tính năng
 
+- [Sổ địa chỉ, mặc định và checkout](docs/address-book.md)
 - [Chat giữa user và admin (Socket.IO)](docs/chat-socket-io.md)
 - [Gửi email xác nhận đơn hàng (Nodemailer)](docs/order-email-nodemailer.md)
+- [Quên mật khẩu và đặt lại mật khẩu qua email](docs/password-reset.md)
 
 ## Database
 
 | Bảng | Các cột | Ghi chú |
 | --- | --- | --- |
-| `users` | `id, name, email, password, role, refresh_token, phone, avatar` | `avatar` lưu đường dẫn `/uploads/...` |
+| `users` | `id, name, email, password, role, refresh_token, phone, avatar, auth_version, reset_password_token_hash, reset_password_expires_at, reset_password_requested_at` | Chỉ lưu hash token reset; `auth_version` dùng thu hồi phiên sau reset |
 | `categories` | `id, name` | |
 | `products` | `id, name, price, category_id, image, description` | `description` là HTML từ Quill editor |
 | `cart_items` | `id, user_id, product_id, quantity` | Unique `(user_id, product_id)` -> thêm trùng thì tăng `quantity` |
@@ -42,6 +44,7 @@ psql -U postgres -d e-commerce-filter_db -f database/seed.sql       # dữ liệ
 | `reviews` | `id, user_id, product_id, rating, comment` | `rating` từ 1 đến 5. Unique `(user_id, product_id)`: mỗi user chỉ đánh giá 1 lần |
 | `favorites` | `id, user_id, product_id` | Unique `(user_id, product_id)` |
 | `messages` | `id, user_id, sender_id, content` | Tin nhắn chat. `sender_id = user_id` là tin của khách, khác là tin của admin |
+| `addresses` | `id, user_id, label, full_name, phone, province_code, province_name, ward_code, ward_name, address_line, is_default` | Sổ địa chỉ riêng của user; một mặc định khi còn địa chỉ |
 
 Ngoài các cột trên, **tất cả các bảng** đều có thêm `created_at`, `updated_at`, `deleted_at` -> model dùng:
 
@@ -84,7 +87,7 @@ cộng thêm `additional: { underscored: true }`. sequelize-auto thấy bảng c
 | `REFRESH_TOKEN_EXPIRES_IN` | Thời gian sống refresh token (vd: `7d`) |
 | `BASE_URL` | Địa chỉ public của server, dùng để ghép link ảnh upload (vd: `http://localhost:3000`) |
 | `CLIENT_URL` | Địa chỉ frontend, dùng cho link trong email (vd: `http://localhost:5173`) |
-| `MAIL_HOST`, `MAIL_PORT`, `MAIL_SECURE`, `MAIL_USER`, `MAIL_PASSWORD`, `MAIL_FROM` | Cấu hình SMTP gửi email đơn hàng, xem [docs/order-email-nodemailer.md](docs/order-email-nodemailer.md) |
+| `MAIL_HOST`, `MAIL_PORT`, `MAIL_SECURE`, `MAIL_USER`, `MAIL_PASSWORD`, `MAIL_FROM` | Cấu hình SMTP gửi email đơn hàng và reset mật khẩu, xem [docs/password-reset.md](docs/password-reset.md) |
 
 ## Luồng xác thực
 
@@ -92,6 +95,7 @@ cộng thêm `additional: { underscored: true }`. sequelize-auto thấy bảng c
 2. Frontend gửi `Authorization: Bearer <accessToken>` ở các API cần đăng nhập.
 3. Access token hết hạn -> API trả `401` -> frontend gọi `POST /refresh-token` với `refreshToken` để lấy access token mới.
 4. `POST /logout` xóa refresh token trong DB -> refresh token cũ không dùng được nữa.
+5. Reset mật khẩu qua email tăng `users.auth_version`, xóa refresh token và ngắt socket đang mở. REST/refresh/socket đối chiếu version trong JWT với DB để từ chối phiên cũ. JWT tạo trước tính năng này được xem là version 0.
 
 ## Danh sách API
 
@@ -101,6 +105,9 @@ cộng thêm `additional: { underscored: true }`. sequelize-auto thấy bảng c
 | --- | --- | --- | --- |
 | POST | `/register` | ✗ | `{ fullName, email, password }` - role luôn là `user` |
 | POST | `/login` | ✗ | `{ email, password }` -> `{ accessToken, refreshToken, user }` |
+| POST | `/forgot-password` | ✗ | `{ email }` -> thông báo chung và `resendAfter: 60`; gửi link qua email nếu có tài khoản |
+| POST | `/reset-password/validate` | ✗ | `{ token }` -> `{ valid: true }`; kiểm tra, không tiêu thụ link |
+| POST | `/reset-password` | ✗ | `{ token, newPassword, confirmPassword }`; đổi mật khẩu, tiêu thụ token, thu hồi phiên |
 | POST | `/refresh-token` | ✗ | `{ refreshToken }` -> `{ accessToken }` |
 | POST | `/logout` | ✓ | Xóa refresh token trong DB |
 | GET | `/profile` | ✓ | Thông tin user đang đăng nhập `{ id, name, email, role, phone, avatar }` |
@@ -145,7 +152,7 @@ Kết quả của API danh sách gồm 2 phần: `data` là danh sách sản ph�
 
 | Method | Đường dẫn | Body / Ghi chú |
 | --- | --- | --- |
-| POST | `/orders` | `{ fullName, phone, address }` -> `{ id, code, totalPrice }`. Lấy sản phẩm từ giỏ, tạo đơn, xóa giỏ (trong 1 transaction), rồi gửi email xác nhận |
+| POST | `/orders` | `{ addressId }` hoặc `{ fullName, phone, provinceCode, wardCode, addressLine }` -> `{ id, code, totalPrice }`. Lấy sản phẩm từ giỏ, tạo đơn, xóa giỏ (trong 1 transaction), rồi gửi email xác nhận. Vẫn hỗ trợ body địa chỉ cũ |
 | GET | `/orders` | Lịch sử đơn hàng, mới nhất lên đầu, kèm `items` |
 | GET | `/orders/:code` | Chi tiết 1 đơn theo mã đơn (chỉ xem được đơn của mình) |
 

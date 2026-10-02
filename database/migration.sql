@@ -153,3 +153,36 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 
 CREATE INDEX IF NOT EXISTS messages_user_id_idx ON messages (user_id);
+
+-- Phần 5: Sổ địa chỉ. Tỉnh/thành và phường/xã lấy từ Province Open API v2.
+-- Lưu cả mã và tên để địa chỉ đã lưu không phụ thuộc việc API đổi tên sau này.
+CREATE TABLE IF NOT EXISTS addresses (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  label VARCHAR(100) NOT NULL DEFAULT '',
+  full_name VARCHAR(100) NOT NULL,
+  phone VARCHAR(20) NOT NULL,
+  province_code INTEGER NOT NULL,
+  province_name VARCHAR(150) NOT NULL,
+  ward_code INTEGER NOT NULL,
+  ward_name VARCHAR(150) NOT NULL,
+  address_line VARCHAR(160) NOT NULL,
+  is_default BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS addresses_user_id_idx ON addresses (user_id);
+-- Database cũng bảo đảm mỗi user chỉ có tối đa 1 địa chỉ mặc định chưa bị xóa.
+CREATE UNIQUE INDEX IF NOT EXISTS addresses_one_default_per_user
+  ON addresses (user_id) WHERE is_default = TRUE AND deleted_at IS NULL;
+
+-- Phần 6: Quên mật khẩu. Chỉ lưu SHA-256 của token, không lưu link/token gốc.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_password_token_hash VARCHAR(64);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_password_expires_at TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_password_requested_at TIMESTAMPTZ;
+-- Tăng version sau reset để access/refresh token cũ mất hiệu lực ngay.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_version INTEGER NOT NULL DEFAULT 0;
+CREATE UNIQUE INDEX IF NOT EXISTS users_reset_password_token_hash_key
+  ON users (reset_password_token_hash) WHERE reset_password_token_hash IS NOT NULL;

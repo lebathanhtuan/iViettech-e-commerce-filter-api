@@ -108,3 +108,29 @@ export async function sendOrderConfirmationEmail(orderId) {
     console.error('Gửi email đơn hàng thất bại:', error)
   }
 }
+
+// Reset password phải báo lỗi cho caller để hủy token nếu SMTP không nhận thư.
+// URL lấy từ CLIENT_URL tin cậy; token trong fragment không bị gửi vào log HTTP frontend.
+export async function sendPasswordResetEmail(user, token) {
+  const resetUrl = new URL('/reset-password', process.env.CLIENT_URL)
+  resetUrl.hash = new URLSearchParams({ token }).toString()
+  const link = resetUrl.toString()
+  const info = await transporter.sendMail({
+    from: process.env.MAIL_FROM || process.env.MAIL_USER,
+    to: user.email,
+    subject: '[MyShop] Đặt lại mật khẩu',
+    text: `Xin chào ${user.name},\nĐặt lại mật khẩu tại: ${link}\nLink có hiệu lực 15 phút và chỉ dùng một lần. Nếu bạn không yêu cầu, hãy bỏ qua email này.`,
+    html: `<div style="max-width:600px;margin:0 auto;font-family:Arial,sans-serif;color:#333">
+      <h2 style="color:#1677ff">MyShop - Đặt lại mật khẩu</h2>
+      <p>Xin chào <strong>${escapeHtml(user.name)}</strong>,</p>
+      <p>Bạn đã yêu cầu đặt lại mật khẩu. Link có hiệu lực <strong>15 phút</strong> và chỉ dùng một lần.</p>
+      <p><a href="${escapeHtml(link)}" style="display:inline-block;padding:12px 20px;background:#1677ff;color:#fff;text-decoration:none;border-radius:4px">Đặt lại mật khẩu</a></p>
+      <p>Nếu nút không mở được, copy link sau vào trình duyệt:</p>
+      <p style="word-break:break-all">${escapeHtml(link)}</p>
+      <p>Nếu bạn không yêu cầu, hãy bỏ qua email này. Mật khẩu của bạn vẫn giữ nguyên.</p>
+    </div>`,
+    disableFileAccess: true,
+    disableUrlAccess: true,
+  })
+  if (!info.accepted?.length) throw new Error('SMTP_REJECTED')
+}

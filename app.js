@@ -15,6 +15,8 @@ import adminProductRoute from './routes/admin/product.route.js'
 import adminChatRoute from './routes/admin/chat.route.js'
 import { errorHandler } from './middlewares/error.middleware.js'
 import { initSocket } from './socket/index.js'
+import addressRoute from './routes/address.route.js'
+import locationRoute from './routes/location.route.js'
 
 const app = express()
 
@@ -25,6 +27,8 @@ app.use(express.json())
 app.use('/uploads', express.static(path.resolve('uploads')))
 
 app.use('/', authRoute) // POST /register, /login, /refresh-token, /logout - GET, PATCH /profile
+app.use('/profile/addresses', addressRoute) // Sổ địa chỉ riêng của user
+app.use('/locations', locationRoute) // Tỉnh/thành và phường/xã theo địa danh mới
 app.use('/categories', categoryRoute) // GET /categories
 app.use('/products', productRoute) // GET /products, /products/:id, /products/:id/reviews - POST /products/:id/reviews
 app.use('/cart', cartRoute) // CRUD giỏ hàng (cần token)

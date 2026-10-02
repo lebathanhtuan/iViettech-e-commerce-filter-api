@@ -12,7 +12,7 @@ const { User } = models
 // Tạo access token (sống ngắn) - dùng để gọi các API cần đăng nhập
 function generateAccessToken(user) {
   return jwt.sign(
-    { id: user.id, email: user.email, role: user.role },
+    { id: user.id, email: user.email, role: user.role, version: user.auth_version },
     process.env.JWT_ACCESS_SECRET,
     { expiresIn: process.env.ACCESS_TOKEN_EXPIRES_IN }
   )
@@ -20,7 +20,7 @@ function generateAccessToken(user) {
 
 // Tạo refresh token (sống dài) - chỉ dùng để xin access token mới
 function generateRefreshToken(user) {
-  return jwt.sign({ id: user.id }, process.env.JWT_REFRESH_SECRET, {
+  return jwt.sign({ id: user.id, version: user.auth_version }, process.env.JWT_REFRESH_SECRET, {
     expiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN,
   })
 }
@@ -95,7 +95,7 @@ export async function refreshToken(req, res) {
 
   // Refresh token phải trùng với token đang lưu trong DB (đã logout thì không dùng được nữa)
   const matchUser = await User.findByPk(decoded.id)
-  if (!matchUser || matchUser.refresh_token !== refreshToken) {
+  if (!matchUser || matchUser.refresh_token !== refreshToken || matchUser.auth_version !== (decoded.version ?? 0)) {
     return res.status(401).json({ message: 'Refresh token không hợp lệ' })
   }
 
@@ -152,7 +152,11 @@ export async function changePassword(req, res) {
   }
 
   const hashedPassword = await bcrypt.hash(newPassword, 10)
-  await user.update({ password: hashedPassword })
+  // Đổi mật khẩu trực tiếp cũng vô hiệu link reset đang chờ.
+  const [updated] = await User.update({ password: hashedPassword,
+    reset_password_token_hash: null, reset_password_expires_at: null, reset_password_requested_at: null },
+  { where: { id: user.id, auth_version: req.user.version } })
+  if (!updated) return res.status(401).json({ message: 'Phiên đăng nhập đã hết hiệu lực' })
 
   res.status(200).json({ message: 'Đổi mật khẩu thành công' })
 }

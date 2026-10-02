@@ -39,6 +39,23 @@ export default class User extends Model {
     avatar: {
       type: DataTypes.STRING(500),
       allowNull: true
+    },
+    reset_password_token_hash: {
+      type: DataTypes.STRING(64),
+      allowNull: true
+    },
+    reset_password_expires_at: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+    reset_password_requested_at: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+    auth_version: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0
     }
   }, {
     sequelize,
@@ -60,6 +77,13 @@ export default class User extends Model {
         unique: true,
         fields: [
           { name: "id" },
+        ]
+      },
+      {
+        name: "users_reset_password_token_hash_key",
+        unique: true,
+        fields: [
+          { name: "reset_password_token_hash" },
         ]
       },
     ]

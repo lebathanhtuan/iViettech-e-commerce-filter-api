@@ -46,3 +46,19 @@ export function formatMessage(message) {
     createdAt: message.createdAt,
   }
 }
+
+export function formatAddress(address) {
+  return {
+    id: address.id,
+    label: address.label,
+    fullName: address.full_name,
+    phone: address.phone,
+    provinceCode: address.province_code,
+    provinceName: address.province_name,
+    wardCode: address.ward_code,
+    wardName: address.ward_name,
+    addressLine: address.address_line,
+    fullAddress: `${address.address_line}, ${address.ward_name}, ${address.province_name}`,
+    isDefault: address.is_default,
+  }
+}

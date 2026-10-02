@@ -1,10 +1,11 @@
 import { randomInt } from 'node:crypto'
 
 import models, { sequelize } from '../models/index.js'
-import { formatProduct } from '../utils/format.js'
+import { formatAddress, formatProduct } from '../utils/format.js'
 import { sendOrderConfirmationEmail } from '../utils/mail.js'
+import { httpError, validateShippingAddress } from '../utils/locations.js'
 
-const { Order, OrderItem, CartItem, Product } = models
+const { Order, OrderItem, CartItem, Product, Address } = models
 
 // Sinh mã đơn hàng gồm 8 ký tự chữ in hoa + số, vd: "K7Q2M9XA"
 // Không dùng id làm mã đơn vì id tăng dần -> người khác đoán được số lượng đơn của shop
@@ -57,12 +58,31 @@ const orderInclude = [
   },
 ]
 
-// POST /orders - đặt hàng từ giỏ hàng hiện tại, body: { fullName, phone, address }
+// POST /orders: { addressId } hoặc { fullName, phone, provinceCode, wardCode, addressLine }
+// Vẫn hỗ trợ body cũ { fullName, phone, address }.
 // Kết quả: { id, code, totalPrice }
 // Thông tin thanh toán (thẻ) chỉ kiểm tra ở frontend, không gửi lên server
 export async function createOrder(req, res) {
   const userId = req.user.id
-  const { fullName, phone, address } = req.body
+  let shipping
+  if (req.body.addressId !== undefined) {
+    const addressId = Number(req.body.addressId)
+    if (!Number.isSafeInteger(addressId) || addressId < 1) throw httpError(400, 'Mã địa chỉ không hợp lệ')
+    const savedAddress = await Address.findOne({ where: { id: addressId, user_id: userId } })
+    if (!savedAddress) throw httpError(404, 'Không tìm thấy địa chỉ')
+    shipping = formatAddress(savedAddress)
+  } else if (req.body.provinceCode !== undefined || req.body.wardCode !== undefined) {
+    shipping = await validateShippingAddress(req.body)
+  } else {
+    // Tương thích với request cũ; vẫn kiểm tra thông tin giao hàng ở backend.
+    const { fullName, phone, address } = req.body
+    if (typeof fullName !== 'string' || !fullName.trim() || fullName.trim().length > 100
+      || typeof phone !== 'string' || !/^0\d{9}$/.test(phone.trim())
+      || typeof address !== 'string' || !address.trim() || address.trim().length > 255) {
+      throw httpError(400, 'Thông tin giao hàng không hợp lệ')
+    }
+    shipping = { fullName: fullName.trim(), phone: phone.trim(), fullAddress: address.trim() }
+  }
 
   // required: true -> bỏ qua sản phẩm đã bị xóa (không cho đặt hàng sản phẩm đã xóa)
   const cartItems = await CartItem.findAll({
@@ -89,9 +109,9 @@ export async function createOrder(req, res) {
       {
         code: code,
         user_id: userId,
-        full_name: fullName,
-        phone: phone,
-        address: address,
+        full_name: shipping.fullName,
+        phone: shipping.phone,
+        address: shipping.fullAddress,
         total_price: totalPrice,
       },
       { transaction }

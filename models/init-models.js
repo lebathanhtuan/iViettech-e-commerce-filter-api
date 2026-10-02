@@ -1,5 +1,6 @@
 import _sequelize from "sequelize";
 const DataTypes = _sequelize.DataTypes;
+import _Address from  "./address.js";
 import _CartItem from  "./cartItem.js";
 import _Category from  "./category.js";
 import _Favorite from  "./favorite.js";
@@ -11,6 +12,7 @@ import _Review from  "./review.js";
 import _User from  "./user.js";
 
 export default function initModels(sequelize) {
+  const Address = _Address.init(sequelize, DataTypes);
   const CartItem = _CartItem.init(sequelize, DataTypes);
   const Category = _Category.init(sequelize, DataTypes);
   const Favorite = _Favorite.init(sequelize, DataTypes);
@@ -33,6 +35,8 @@ export default function initModels(sequelize) {
   Product.hasMany(OrderItem, { as: "order_items", foreignKey: "product_id"});
   Review.belongsTo(Product, { as: "product", foreignKey: "product_id"});
   Product.hasMany(Review, { as: "reviews", foreignKey: "product_id"});
+  Address.belongsTo(User, { as: "user", foreignKey: "user_id"});
+  User.hasMany(Address, { as: "addresses", foreignKey: "user_id"});
   CartItem.belongsTo(User, { as: "user", foreignKey: "user_id"});
   User.hasMany(CartItem, { as: "cart_items", foreignKey: "user_id"});
   Favorite.belongsTo(User, { as: "user", foreignKey: "user_id"});
@@ -47,6 +51,7 @@ export default function initModels(sequelize) {
   User.hasMany(Review, { as: "reviews", foreignKey: "user_id"});
 
   return {
+    Address,
     CartItem,
     Category,
     Favorite,

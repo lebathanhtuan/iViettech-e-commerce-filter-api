@@ -94,9 +94,10 @@ socket.emit('chat:send', { content: 'Xin chào' }, (response) => {
 ### Xác thực socket
 
 - Frontend gửi access token lúc kết nối: `io(URL, { auth: (cb) => cb({ token }) })`. Dùng hàm thay vì object để mỗi lần kết nối lại đều lấy token mới nhất trong `localStorage`.
-- Server kiểm tra token trong `io.use()`. Token sai hoặc hết hạn thì trả lỗi `UNAUTHORIZED`.
+- Server kiểm tra token và `users.auth_version` trong `io.use()` qua `utils/auth.js`. Token sai, hết hạn hoặc phiên đã bị thu hồi thì trả lỗi `UNAUTHORIZED`.
 - Frontend nhận lỗi ở `connect_error`, gọi `refreshAccessToken()` (dùng chung với interceptor axios) rồi `socket.connect()` lại. Server từ chối kết nối thì socket.io **không tự kết nối lại**, nên phải gọi `connect()` bằng tay.
 - Token chỉ được kiểm tra **lúc kết nối**. Đang kết nối mà token hết hạn thì vẫn chat bình thường.
+- Khi reset mật khẩu qua email, server ngắt ngay tất cả socket của user trong room `session:<id>`. Access/refresh token cũ không thể kết nối lại. Xem [reset mật khẩu](password-reset.md).
 
 ## 3. Các file liên quan
 
