@@ -14,10 +14,10 @@
 
 ## Cấu hình local
 
-Chạy migration trên DB đang dùng để thêm các cột ở **Phần 6**:
+Các cột quên mật khẩu (`reset_password_*`, `auth_version`) nằm trong bảng `users` của `database/schema.sql`.
+DB tạo từ file này đã có sẵn, chỉ cần chạy backend:
 
 ```bash
-psql -h localhost -U postgres -d e-commerce-filter_db -f database/migration.sql
 npm run dev
 ```
 
@@ -79,7 +79,7 @@ Tham khảo: [OWASP Forgot Password Cheat Sheet](https://cheatsheetseries.owasp.
 
 ## Deploy
 
-1. Chạy migration trước khi khởi động phiên bản backend mới; giữ `MAIL_*`,
+1. Tạo DB từ `database/schema.sql` (hoặc `npm run db:sync`) trước khi khởi động backend; giữ `MAIL_*`,
    DB và JWT secrets trong biến môi trường của host.
 2. Đặt `CLIENT_URL=https://domain-frontend-cua-ban` và `VITE_API_URL` là URL
    backend. Link được tạo từ `CLIENT_URL` tin cậy, không lấy từ header `Host`.

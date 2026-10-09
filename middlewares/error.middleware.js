@@ -9,7 +9,7 @@ export function errorHandler(error, req, res, next) {
   // 1. Lỗi do Multer tạo ra (file quá lớn, upload quá nhiều file...)
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ message: 'File vượt quá giới hạn 5 MB' })
+      return res.status(400).json({ message: 'File vượt quá giới hạn 4 MB' })
     }
     return res.status(400).json({ message: error.message })
   }

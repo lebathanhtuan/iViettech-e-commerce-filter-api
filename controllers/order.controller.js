@@ -1,4 +1,5 @@
 import { randomInt } from 'node:crypto'
+import { waitUntil } from '@vercel/functions'
 
 import models, { sequelize } from '../models/index.js'
 import { formatAddress, formatProduct } from '../utils/format.js'
@@ -136,7 +137,8 @@ export async function createOrder(req, res) {
   // Gửi email xác nhận đơn hàng. Cố ý KHÔNG await:
   // - user không phải chờ gửi mail xong (mất vài giây) mới thấy trang đặt hàng thành công
   // - gửi mail lỗi (sai cấu hình, mất mạng...) cũng không ảnh hưởng tới đơn hàng đã tạo
-  sendOrderConfirmationEmail(newOrder.id)
+  // waitUntil: trên Vercel, giữ function chạy tới khi gửi mail xong (local không ảnh hưởng)
+  waitUntil(sendOrderConfirmationEmail(newOrder.id))
 
   res.status(201).json({
     id: newOrder.id,

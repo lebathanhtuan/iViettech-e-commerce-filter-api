@@ -2,6 +2,7 @@ import { Op } from 'sequelize'
 
 import models from '../models/index.js'
 import { formatProduct } from '../utils/format.js'
+import { uploadImage } from '../utils/storage.js'
 
 const { Product, Category } = models
 
@@ -104,8 +105,8 @@ export async function getAdminProducts(req, res) {
 export async function createProduct(req, res) {
   const { name, price, categoryId, description } = req.body
 
-  // req.file do upload.single('image') tạo ra. Chỉ lưu đường dẫn tương đối, không lưu req.file.path
-  const image = req.file ? `/uploads/${req.file.filename}` : null
+  // req.file do upload.single('image') tạo ra -> upload lên Supabase Storage, lưu URL public đầy đủ
+  const image = req.file ? await uploadImage(req.file) : null
 
   const newProduct = await Product.create({
     name: name,
@@ -138,7 +139,7 @@ export async function updateProduct(req, res) {
 
   // Có gửi file mới thì mới đổi ảnh, không thì giữ ảnh cũ
   if (req.file) {
-    updateData.image = `/uploads/${req.file.filename}`
+    updateData.image = await uploadImage(req.file)
   }
 
   const result = await product.update(updateData)

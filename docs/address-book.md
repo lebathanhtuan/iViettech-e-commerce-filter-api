@@ -6,14 +6,14 @@ phường/xã/đặc khu và địa chỉ chi tiết. Không có bước chọn 
 
 ## 1. Cài đặt
 
-Chạy migration trên database của dự án, rồi khởi động lại backend:
+Tạo bảng còn thiếu trên database của dự án, rồi khởi động lại backend:
 
 ```bash
-psql -h localhost -U postgres -d e-commerce-filter_db -f database/migration.sql
+psql -h localhost -U postgres -d e-commerce-filter_db -f database/schema.sql   # hoặc: npm run db:sync
 npm run dev
 ```
 
-Phần 5 của migration tạo bảng `addresses` và index. Model `Address` đã được sinh
+Phần "Sổ địa chỉ" trong `schema.sql` tạo bảng `addresses` và index. Model `Address` đã được sinh
 bằng `sequelize-auto` và commit cùng code. Nếu sửa schema sau này, chạy
 `npm run generate-models` theo quy ước chung. Không cần cài thêm thư viện.
 
