@@ -1,34 +1,20 @@
-import fs from 'node:fs'
 import path from 'node:path'
-import { randomUUID } from 'node:crypto'
 import multer from 'multer'
 
-// 1. Thư mục lưu file: <project>/uploads (tạo nếu chưa có)
-const uploadDir = path.resolve('uploads')
-fs.mkdirSync(uploadDir, { recursive: true })
+// 1. Vercel không cho ghi file ra ổ đĩa -> giữ file trong RAM (req.file.buffer)
+//    rồi controller upload tiếp lên Supabase Storage (utils/storage.js)
+const storage = multer.memoryStorage()
 
-// 2. Cấu hình diskStorage: lưu file ở đâu, đặt tên file thế nào
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir)
-  },
-  // Không giữ tên gốc vì có thể trùng -> tạo tên duy nhất: image-<uuid>.jpg
-  filename: (req, file, cb) => {
-    const extension = path.extname(file.originalname).toLowerCase()
-    cb(null, `${file.fieldname}-${randomUUID()}${extension}`)
-  },
-})
-
-// 3. Chỉ cho phép upload ảnh
+// 2. Chỉ cho phép upload ảnh
 const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp']
 const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp']
 
-// 4. Tạo middleware upload
+// 3. Tạo middleware upload
 const upload = multer({
   storage: storage,
-  // Tối đa 5 MB / file
+  // Tối đa 4 MB / file (Vercel giới hạn cả request 4.5 MB)
   limits: {
-    fileSize: 5 * 1024 * 1024,
+    fileSize: 4 * 1024 * 1024,
   },
   fileFilter: (req, file, cb) => {
     const extension = path.extname(file.originalname).toLowerCase()

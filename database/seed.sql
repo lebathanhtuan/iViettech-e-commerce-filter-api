@@ -1,4 +1,4 @@
--- Dữ liệu mẫu để test (chạy SAU schema.sql và migration.sql)
+-- Dữ liệu mẫu để test (chạy SAU schema.sql)
 -- CHÚ Ý: file này XÓA HẾT dữ liệu cũ trong tất cả các bảng rồi thêm lại từ đầu
 --
 -- Tất cả tài khoản đều có mật khẩu: 123456

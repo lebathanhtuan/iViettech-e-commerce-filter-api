@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto'
 import bcrypt from 'bcryptjs'
+import { waitUntil } from '@vercel/functions'
 import { Op } from 'sequelize'
 import models, { sequelize } from '../models/index.js'
 import { isMailConfigured } from '../config/mail.js'
@@ -44,13 +45,14 @@ export async function forgotPassword(req, res) {
   if (user) {
     // Không chờ SMTP để thời gian trả response không làm lộ email có tài khoản hay không.
     // Khác email đơn hàng: SMTP lỗi thì xóa token đúng lần gửi đó, cho phép yêu cầu lại.
-    sendPasswordResetEmail(user, token).catch(async (error) => {
+    // waitUntil: trên Vercel, giữ function chạy tới khi gửi mail xong (local không ảnh hưởng)
+    waitUntil(sendPasswordResetEmail(user, token).catch(async (error) => {
       console.error('Gửi email reset mật khẩu thất bại:', error.code || 'SMTP_ERROR')
       try {
         await User.update({ reset_password_token_hash: null, reset_password_expires_at: null, reset_password_requested_at: null },
           { where: { id: user.id, reset_password_token_hash: tokenHash } })
       } catch { console.error('Không thể hủy token reset sau lỗi SMTP') }
-    })
+    }))
   }
   res.json({ message: REQUEST_MESSAGE, resendAfter: 60 })
 }

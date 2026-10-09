@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken'
 
 import models from '../models/index.js'
 import { formatUser } from '../utils/format.js'
+import { uploadImage } from '../utils/storage.js'
 
 const { User } = models
 
@@ -173,7 +174,7 @@ export async function updateAvatar(req, res) {
     return res.status(404).json({ message: 'Không tìm thấy user' })
   }
 
-  const result = await user.update({ avatar: `/uploads/${req.file.filename}` })
+  const result = await user.update({ avatar: await uploadImage(req.file) })
 
   res.status(200).json(formatUser(result))
 }

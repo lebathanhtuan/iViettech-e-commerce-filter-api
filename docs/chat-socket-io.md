@@ -12,10 +12,10 @@ Mỗi user chỉ có **1 cuộc trò chuyện** với shop. Tất cả admin dù
 npm install            # package socket.io đã có sẵn trong package.json
 ```
 
-Tạo bảng `messages` bằng cách chạy lại `migration.sql` (chạy lại nhiều lần cũng không sao):
+Tạo bảng `messages` bằng cách chạy lại `schema.sql` (chạy lại nhiều lần cũng không sao):
 
 ```bash
-psql -U postgres -d e-commerce-filter_db -f database/migration.sql
+psql -U postgres -d e-commerce-filter_db -f database/schema.sql   # hoặc: npm run db:sync
 ```
 
 Không cần thêm biến môi trường nào. Socket dùng chung port (`PORT`) và `JWT_ACCESS_SECRET` với API.
@@ -145,7 +145,7 @@ src/pages/admin/Chat/                   # Trang /admin/chat
 | Hiện tượng | Nguyên nhân / cách sửa |
 | --- | --- |
 | Không hiện nút chat | Chưa đăng nhập, hoặc đang đăng nhập bằng admin (admin dùng trang `/admin/chat`) |
-| `relation "messages" does not exist` | Chưa chạy lại `database/migration.sql` |
+| `relation "messages" does not exist` | Chưa chạy lại `database/schema.sql` (hoặc `npm run db:sync`) |
 | Gửi tin báo "Không gửi được tin nhắn" | Backend chưa chạy, hoặc `VITE_API_URL` sai địa chỉ |
 | 2 tab cùng trình duyệt thấy chung 1 tài khoản | Token lưu ở `localStorage` dùng chung cho mọi tab. Test bằng 2 trình duyệt, hoặc 1 cửa sổ ẩn danh |
 | Deploy lên server thật mà socket không kết nối được | Reverse proxy (Nginx...) phải cho phép WebSocket: `proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade";` |

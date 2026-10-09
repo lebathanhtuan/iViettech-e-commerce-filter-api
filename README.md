@@ -10,16 +10,20 @@ cp .env.example .env   # rồi sửa thông tin DB nếu cần
 npm run dev
 ```
 
-Chạy file `database/migration.sql` để thêm các cột / bảng mới (chạy lại nhiều lần cũng không sao).
-File này cũng tạo sẵn tài khoản admin: `admin@example.com` / `123456`.
-
 Tạo database mới từ đầu (DB trống) thì chạy lần lượt:
 
 ```bash
 createdb -U postgres e-commerce-filter_db
-psql -U postgres -d e-commerce-filter_db -f database/schema.sql     # bảng gốc: users, categories, products
-psql -U postgres -d e-commerce-filter_db -f database/migration.sql  # các cột / bảng còn lại
-psql -U postgres -d e-commerce-filter_db -f database/seed.sql       # dữ liệu mẫu (XÓA HẾT dữ liệu cũ)
+psql -U postgres -d e-commerce-filter_db -f database/schema.sql  # toàn bộ bảng, index, ràng buộc
+psql -U postgres -d e-commerce-filter_db -f database/seed.sql    # dữ liệu mẫu (XÓA HẾT dữ liệu cũ)
+```
+
+Hoặc dùng script (không cần cài `psql`): đặt `SUPABASE_DB_URL` trong `.env` là connection string của DB cần tạo
+(vd `postgresql://postgres:postgres@localhost:5432/e-commerce-filter_db` hoặc DB trên Supabase) rồi chạy:
+
+```bash
+npm run db:seed   # schema.sql + seed.sql (hỏi xác nhận vì XÓA HẾT dữ liệu cũ)
+npm run db:sync   # chỉ schema.sql: tạo bảng / index còn thiếu, không đụng dữ liệu
 ```
 
 `seed.sql` tạo 4 tài khoản (mật khẩu đều là `123456`): `admin@example.com` (admin), `an@example.com`, `binh@example.com`, `chi@example.com`.
@@ -73,7 +77,10 @@ npx sequelize-auto -o "./models" -d <DB_NAME> -h <DB_HOST> -u <DB_USER> -x <DB_P
 
 cộng thêm `additional: { underscored: true }`. sequelize-auto thấy bảng có `created_at / updated_at / deleted_at` sẽ tự thêm `timestamps: true`, `paranoid: true`.
 
-> Sửa DB (thêm cột / bảng) -> cập nhật `database/migration.sql`, chạy lại nó rồi chạy `npm run generate-models`. Không sửa tay trong `models/` vì lần sinh sau sẽ bị ghi đè.
+> Sửa DB (thêm cột / bảng):
+> 1. Sửa `database/schema.sql` để file luôn mô tả **đầy đủ** cấu trúc DB (DB tạo mới từ file này phải đúng ngay).
+> 2. Với DB **đang có dữ liệu** (local, Supabase): bảng mới thì `npm run db:sync` là đủ. Thêm / sửa cột trong bảng đã có thì chạy câu `ALTER TABLE ...` tương ứng **1 lần** (psql hoặc SQL Editor của Supabase), vì `CREATE TABLE IF NOT EXISTS` bỏ qua bảng đã tồn tại.
+> 3. Chạy `npm run generate-models`. Không sửa tay trong `models/` vì lần sinh sau sẽ bị ghi đè.
 
 ## Biến môi trường (.env)
 
@@ -262,8 +269,7 @@ routes/
 ├── chat.route.js           # Lịch sử chat của user
 ├── admin/product.route.js  # API admin (router.use(verifyToken, checkAdmin))
 └── admin/chat.route.js     # API chat cho admin
-database/schema.sql         # Bảng gốc cho DB mới (users, categories, products)
-database/migration.sql      # Thêm cột / bảng mới + tài khoản admin mẫu
+database/schema.sql         # Toàn bộ cấu trúc DB (bảng, index, ràng buộc)
 database/seed.sql           # Dữ liệu mẫu (xóa hết dữ liệu cũ)
 docs/                       # Hướng dẫn setup chat, email
 uploads/                    # File ảnh upload (không commit)
